@@ -6,6 +6,7 @@ struct MainView: View {
     @State private var folderURL: URL? = nil
     @State private var fileURLs: [URL] = []
     @State private var folderAccessGranted = false
+    @Environment(\.scenePhase) private var scenePhase
     
     var body: some View {
         NavigationStack {
@@ -76,6 +77,16 @@ struct MainView: View {
                 }
             }
         }
+        .onAppear {
+            #if DEBUG
+            print("[MainView] onAppear – ready")
+            #endif
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            #if DEBUG
+            print("[MainView] scenePhase ->", String(describing: newPhase))
+            #endif
+        }
     }
     
     // MARK: – Helpers
@@ -101,11 +112,17 @@ struct MainView: View {
         // Always update state on the main thread
         DispatchQueue.main.async {
             self.fileURLs = collected
+            #if DEBUG
+            print("[MainView] Loaded files:", collected.map { $0.lastPathComponent })
+            #endif
         }
     }
 
     // Parse a vocabulary TSV file into flashcard tuples
     private func parseVocabularyFile(at fileURL: URL) -> [(prompt: String, translation: String)]? {
+        #if DEBUG
+        print("[Parser] Reading:", fileURL.path)
+        #endif
         guard let data = try? Data(contentsOf: fileURL),
               let content = String(data: data, encoding: .utf8) else {
             return nil

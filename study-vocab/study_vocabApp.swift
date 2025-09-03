@@ -9,6 +9,11 @@ import SwiftUI
 
 @main
 struct study_vocabApp: App {
+    #if DEBUG
+    init() {
+        print("[App] init – starting study-vocab")
+    }
+    #endif
     var body: some Scene {
         WindowGroup {
             MainView()          // instead of ContentView()
