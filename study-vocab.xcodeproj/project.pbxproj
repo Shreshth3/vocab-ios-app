@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		67DF450C2DB3B92E00390CD5 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 67DF450B2DB3B92E00390CD5 /* LaunchScreen.storyboard */; };
+		67DF45122DB3BA2000390CD5 /* vocab-lists in Resources */ = {isa = PBXBuildFile; fileRef = 67DF45112DB3BA2000390CD5 /* vocab-lists */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,6 +33,7 @@
 		67767DB62DB2889E009656CC /* study-vocabTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "study-vocabTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		67767DC02DB2889E009656CC /* study-vocabUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "study-vocabUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		67DF450B2DB3B92E00390CD5 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		67DF45112DB3BA2000390CD5 /* vocab-lists */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "vocab-lists"; path = "../../quizlet-automations/vocab-ui/vocab-lists"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -81,6 +83,7 @@
 			isa = PBXGroup;
 			children = (
 				67DF450B2DB3B92E00390CD5 /* LaunchScreen.storyboard */,
+				67DF45112DB3BA2000390CD5 /* vocab-lists */,
 				67767DAB2DB2889C009656CC /* study-vocab */,
 				67767DB92DB2889E009656CC /* study-vocabTests */,
 				67767DC32DB2889E009656CC /* study-vocabUITests */,
@@ -219,6 +222,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				67DF450C2DB3B92E00390CD5 /* LaunchScreen.storyboard in Resources */,
+				67DF45122DB3BA2000390CD5 /* vocab-lists in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

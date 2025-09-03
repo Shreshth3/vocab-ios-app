@@ -6,25 +6,26 @@ struct MainView: View {
     @State private var folderURL: URL? = nil
     @State private var fileURLs: [URL] = []
     @State private var folderAccessGranted = false
+    @State private var attemptedDefaultImport = false
     @Environment(\.scenePhase) private var scenePhase
-    
+
+    // MARK: – Default folder
+    // Prefer a bundled folder reference named "vocab-lists" (wired in the Xcode project)
+    // which points to ../../quizlet-automations/vocab-ui/vocab-lists relative to project root.
+    // Fallback to absolute path if the bundle reference is unavailable on this machine.
+    private let bundledDefaultFolderName = "vocab-lists"
+    private let fallbackDefaultFolderAbsolutePath = "/Users/shreshth/git-repos/quizlet-automations/vocab-ui/vocab-lists"
+
     var body: some View {
         NavigationStack {
             ZStack {
                 // Dark background consistent with the rest of the app
                 Color(red: 45/255, green: 45/255, blue: 45/255)
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 24) {
-                    // MARK: – Initial state — no folder chosen
-                    if folderURL == nil {
-                        Button("Import Folder") {
-                            showingImporter = true
-                        }
-                        .buttonStyle(PressableAccentButtonStyle())   // Style defined in ContentView.swift
-                        
-                    // MARK: – Folder chosen — list files
-                    } else {
+                    // MARK: – File list (when a folder is selected or default loaded)
+                    if folderURL != nil {
                         ScrollView {
                             VStack(spacing: 12) {
                                 ForEach(fileURLs, id: \.self) { url in
@@ -44,13 +45,19 @@ struct MainView: View {
                             .padding(.horizontal)
                             .padding(.top)
                         }
-                        
-                        Button("Choose Another Folder") {
-                            showingImporter = true
-                        }
-                        .buttonStyle(PressableAccentButtonStyle())
-                        .padding(.bottom)
+                    } else {
+                        // Placeholder when no folder is available yet
+                        Text("No folder selected")
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding(.top)
                     }
+
+                    // Bottom action to choose/overwrite folder (including default)
+                    Button("Choose Folder") {
+                        showingImporter = true
+                    }
+                    .buttonStyle(PressableAccentButtonStyle())
+                    .padding(.bottom)
                 }
                 .padding(.top)
             }
@@ -78,6 +85,31 @@ struct MainView: View {
             }
         }
         .onAppear {
+            // Attempt default import once on first appear
+            if !attemptedDefaultImport {
+                attemptedDefaultImport = true
+                if let bundleURL = Bundle.main.url(forResource: bundledDefaultFolderName, withExtension: nil) {
+                    self.folderURL = bundleURL
+                    loadFiles(from: bundleURL)
+                    #if DEBUG
+                    print("[MainView] Loaded bundled default folder:", bundleURL.path)
+                    #endif
+                } else {
+                    let defaultURL = URL(fileURLWithPath: fallbackDefaultFolderAbsolutePath, isDirectory: true)
+                    var isDir: ObjCBool = false
+                    if FileManager.default.fileExists(atPath: defaultURL.path, isDirectory: &isDir), isDir.boolValue {
+                        self.folderURL = defaultURL
+                        loadFiles(from: defaultURL)
+                        #if DEBUG
+                        print("[MainView] Loaded fallback default folder:", defaultURL.path)
+                        #endif
+                    } else {
+                        #if DEBUG
+                        print("[MainView] Default folder missing or not a directory:", defaultURL.path)
+                        #endif
+                    }
+                }
+            }
             #if DEBUG
             print("[MainView] onAppear – ready")
             #endif
