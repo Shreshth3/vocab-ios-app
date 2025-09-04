@@ -5,9 +5,12 @@ struct MainView: View {
     @State private var showingImporter = false
     @State private var folderURL: URL? = nil
     @State private var fileURLs: [URL] = []
+    @State private var selectedFileURLs: Set<URL> = []
     @State private var folderAccessGranted = false
     @State private var attemptedDefaultImport = false
     @Environment(\.scenePhase) private var scenePhase
+    @State private var navigateToMerged = false
+    @State private var mergedDeck: [(prompt: String, translation: String)]? = nil
 
     // MARK: – Default folder
     // Prefer a bundled folder reference named "vocab-lists" (wired in the Xcode project)
@@ -24,6 +27,16 @@ struct MainView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 24) {
+                    // Hidden navigation for merged study session
+                    NavigationLink(isActive: $navigateToMerged) {
+                        if let deck = mergedDeck {
+                            ContentView(deck: deck)
+                        } else {
+                            Text("")
+                        }
+                    } label: { EmptyView() }
+                    .hidden()
+
                     // MARK: – File list (when a folder is selected or default loaded)
                     if folderURL != nil {
                         ScrollView {
@@ -36,8 +49,18 @@ struct MainView: View {
                                             Text("Failed to load file")
                                         }
                                     } label: {
-                                        Text(url.lastPathComponent)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        HStack(spacing: 12) {
+                                            Button(action: {
+                                                toggleSelection(for: url)
+                                            }) {
+                                                Image(systemName: selectedFileURLs.contains(url) ? "checkmark.square.fill" : "square")
+                                                    .foregroundColor(.blue)
+                                            }
+                                            .buttonStyle(.plain)
+
+                                            Text(url.lastPathComponent)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
                                     }
                                     .buttonStyle(PressableAccentButtonStyle())
                                 }
@@ -52,11 +75,20 @@ struct MainView: View {
                             .padding(.top)
                     }
 
-                    // Bottom action to choose/overwrite folder (including default)
-                    Button("Choose Folder") {
-                        showingImporter = true
+                    // Bottom actions: choose folder and start studying
+                    HStack(spacing: 12) {
+                        Button("Choose Folder") {
+                            showingImporter = true
+                        }
+                        .buttonStyle(PressableAccentButtonStyle())
+
+                        Button("Start Studying") {
+                            startMergedStudy()
+                        }
+                        .buttonStyle(PressableAccentButtonStyle(backgroundColor: .blue))
+                        .disabled(selectedFileURLs.isEmpty)
+                        .opacity(selectedFileURLs.isEmpty ? 0.6 : 1)
                     }
-                    .buttonStyle(PressableAccentButtonStyle())
                     .padding(.bottom)
                 }
                 .padding(.top)
@@ -144,6 +176,8 @@ struct MainView: View {
         // Always update state on the main thread
         DispatchQueue.main.async {
             self.fileURLs = collected
+            // Clear selections that are no longer present
+            self.selectedFileURLs = self.selectedFileURLs.intersection(Set(collected))
             #if DEBUG
             print("[MainView] Loaded files:", collected.map { $0.lastPathComponent })
             #endif
@@ -168,6 +202,28 @@ struct MainView: View {
         }
 
         return cards
+    }
+
+    private func toggleSelection(for url: URL) {
+        if selectedFileURLs.contains(url) {
+            selectedFileURLs.remove(url)
+        } else {
+            selectedFileURLs.insert(url)
+        }
+    }
+
+    private func startMergedStudy() {
+        // Ensure deterministic order by using current file list order
+        let chosen = fileURLs.filter { selectedFileURLs.contains($0) }
+        var combined: [(prompt: String, translation: String)] = []
+        for url in chosen {
+            if let deck = parseVocabularyFile(at: url) {
+                combined.append(contentsOf: deck)
+            }
+        }
+        guard !combined.isEmpty else { return }
+        mergedDeck = combined
+        navigateToMerged = true
     }
 }
 
