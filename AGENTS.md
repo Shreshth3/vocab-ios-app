@@ -38,3 +38,9 @@
 - App: `study_vocabApp` launches `MainView` (folder import, TSV parsing) → `ContentView` (flashcards, dark theme).
 - Files access: Uses security-scoped resources; close previous access before switching folders (already handled).
 - Assets: Add images/colors to `Assets.xcassets`; keep names stable.
+
+## Vocabulary Data Directory
+- Default folder: bundled folder reference `vocab-lists` (added to the Xcode project). The folder reference points to `../../quizlet-automations/vocab-ui/vocab-lists` relative to the repo root.
+- Fallback (local absolute path): `/Users/shreshth/git-repos/quizlet-automations/vocab-ui/vocab-lists`.
+- Runtime override: users can choose a folder via the Files picker.
+- Implementation: see `study-vocab/MainView.swift` (properties `bundledDefaultFolderName` and `fallbackDefaultFolderAbsolutePath`).
