@@ -168,6 +168,14 @@ struct MainView: View {
                 // Keep only regular files (exclude subfolders)
                 (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
             }
+            // Sort by start number parsed from filename: "subtlex-<start>-<end>.txt"
+            collected = collected.sorted { lhs, rhs in
+                let l = startNumber(from: lhs)
+                let r = startNumber(from: rhs)
+                if l != r { return l < r }
+                // Tie-breaker for unexpected duplicates
+                return lhs.lastPathComponent.localizedCaseInsensitiveCompare(rhs.lastPathComponent) == .orderedAscending
+            }
             
         } catch {
             print("Failed to list folder contents:", error.localizedDescription)
@@ -182,6 +190,17 @@ struct MainView: View {
             print("[MainView] Loaded files:", collected.map { $0.lastPathComponent })
             #endif
         }
+    }
+
+    // Extract the numeric start value from filenames like: "subtlex-<start>-<end>.txt"
+    private func startNumber(from url: URL) -> Int {
+        let name = url.deletingPathExtension().lastPathComponent
+        // Expected: ["subtlex", "<start>", "<end>"]
+        let parts = name.split(separator: "-")
+        if parts.count >= 3, parts[0].lowercased() == "subtlex", let start = Int(parts[1]) {
+            return start
+        }
+        return Int.max // Push unexpected filenames to the end
     }
 
     // Parse a vocabulary TSV file into flashcard tuples
