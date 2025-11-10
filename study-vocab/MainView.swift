@@ -300,6 +300,87 @@ struct MainView: View {
             print("[MainView] Finished displaying review records")
             print(String(repeating: "=", count: 80) + "\n")
             #endif
+
+            // Compute scores for each word in the deck
+            let deckSize = combined.count
+            let scoreIncreaseForIncorrect = (1.0 / 120.0) * (Double(deckSize) - 30.0)
+            let scoreDecreaseForCorrect = (1.0 / 5.0) * scoreIncreaseForIncorrect
+
+            #if DEBUG
+            print("\n" + String(repeating: "=", count: 80))
+            print("[MainView] Computing scores for deck")
+            print("Deck size: \(deckSize)")
+            print("Score increase per incorrect: \(scoreIncreaseForIncorrect)")
+            print("Score decrease per correct: \(scoreDecreaseForCorrect)")
+            print(String(repeating: "=", count: 80))
+            #endif
+
+            // Group records by cardPrompt and count correct/wrong actions
+            var promptStats: [String: (correctCount: Int, wrongCount: Int)] = [:]
+
+            for record in reviewRecords {
+                guard let cardPrompt = record["cardPrompt"] as? String,
+                      let type = record["type"] as? String else {
+                    continue
+                }
+
+                var stats = promptStats[cardPrompt] ?? (correctCount: 0, wrongCount: 0)
+
+                if type == "card_correct" {
+                    stats.correctCount += 1
+                } else if type == "card_incorrect" {
+                    stats.wrongCount += 1
+                }
+
+                promptStats[cardPrompt] = stats
+            }
+
+            // Compute scores for each word
+            var wordScores: [String: Double] = [:]
+
+            for prompt in prompts {
+                let stats = promptStats[prompt] ?? (correctCount: 0, wrongCount: 0)
+                let wrongCount = stats.wrongCount
+                let correctCount = stats.correctCount
+
+                let score: Double
+                if wrongCount == 0 {
+                    // Never got word wrong
+                    score = 1.0
+                } else {
+                    // Apply scoring formula
+                    var computedScore = 1.0 +
+                        (Double(wrongCount) * scoreIncreaseForIncorrect) -
+                        (Double(correctCount) * scoreDecreaseForCorrect)
+
+                    // Floor at 1.0
+                    computedScore = max(1.0, computedScore)
+                    score = computedScore
+                }
+
+                wordScores[prompt] = score
+            }
+
+            // Print scores
+            #if DEBUG
+            print("\n" + String(repeating: "=", count: 80))
+            print("[MainView] Word Scores (sorted by score, descending)")
+            print(String(repeating: "=", count: 80))
+
+            let sortedScores = wordScores.sorted { $0.value > $1.value }
+            for (index, (prompt, score)) in sortedScores.enumerated() {
+                let stats = promptStats[prompt] ?? (correctCount: 0, wrongCount: 0)
+                print("\n\(index + 1). Prompt: \(prompt)")
+                print("   Score: \(String(format: "%.4f", score))")
+                print("   Wrong: \(stats.wrongCount), Correct: \(stats.correctCount)")
+            }
+
+            print("\n" + String(repeating: "=", count: 80))
+            print("[MainView] Total words: \(wordScores.count)")
+            print("[MainView] Words with score > 1.0: \(wordScores.values.filter { $0 > 1.0 }.count)")
+            print("[MainView] Average score: \(String(format: "%.4f", wordScores.values.reduce(0, +) / Double(wordScores.count)))")
+            print(String(repeating: "=", count: 80) + "\n")
+            #endif
         }
 
         mergedDeck = combined
