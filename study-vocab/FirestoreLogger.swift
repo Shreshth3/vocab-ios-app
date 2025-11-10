@@ -9,11 +9,13 @@ import Foundation
 import FirebaseFirestore
 
 /// Singleton service for logging user actions to Cloud Firestore as append-only logs
+@MainActor
 class FirestoreLogger {
     static let shared = FirestoreLogger()
 
     private let db = Firestore.firestore()
     private let sessionID: String
+    let buffer = LogBuffer.shared
 
     private init() {
         // Generate a unique session ID when the logger is initialized
@@ -100,6 +102,11 @@ class FirestoreLogger {
             mode: mode,
             additionalData: ["completionRate": completionRate]
         )
+    }
+
+    /// Flush all pending buffered logs to Firestore immediately
+    func flushPendingLogs() {
+        buffer.flushAll()
     }
 
     /// Fetch review records for given card prompts from Firestore
@@ -212,16 +219,26 @@ class FirestoreLogger {
     }
 
     private func writeLog(data: [String: Any]) {
-        // Write to the "user_actions" collection with auto-generated document ID
-        db.collection("user_actions").addDocument(data: data) { error in
-            if let error = error {
-                #if DEBUG
-                print("[FirestoreLogger] Error writing log: \(error.localizedDescription)")
-                #endif
-            } else {
-                #if DEBUG
-                print("[FirestoreLogger] Successfully logged: \(data["type"] ?? "unknown")")
-                #endif
+        let logType = data["type"] as? String
+
+        // Buffer card_correct and card_incorrect to allow undo cancellation
+        if logType == "card_correct" || logType == "card_incorrect" {
+            buffer.push(data: data)
+            #if DEBUG
+            print("[FirestoreLogger] Buffered log: \(logType ?? "unknown")")
+            #endif
+        } else {
+            // Write immediately for all other log types
+            db.collection("user_actions").addDocument(data: data) { error in
+                if let error = error {
+                    #if DEBUG
+                    print("[FirestoreLogger] Error writing log: \(error.localizedDescription)")
+                    #endif
+                } else {
+                    #if DEBUG
+                    print("[FirestoreLogger] Successfully logged: \(data["type"] ?? "unknown")")
+                    #endif
+                }
             }
         }
     }

@@ -299,13 +299,18 @@ struct ContentView: View {
                                 wrongCards.remove(at: idx)
                             }
 
-                            // Log undo action
-                            if shouldLog {
-                                logger.logUndo(
-                                    currentIndex: currentIndex,
-                                    deckSize: deck.count,
-                                    mode: mode
-                                )
+                            // Try to cancel buffered log entry first
+                            Task { @MainActor in
+                                let wasCanceled = logger.buffer.pop()
+
+                                // If buffer was empty (entry already flushed), log undo as fallback
+                                if !wasCanceled && shouldLog {
+                                    logger.logUndo(
+                                        currentIndex: currentIndex,
+                                        deckSize: deck.count,
+                                        mode: mode
+                                    )
+                                }
                             }
 
                             showTranslation = false
@@ -345,6 +350,12 @@ struct ContentView: View {
             if !hasLoggedSession && shouldLog {
                 logger.logSessionStart(deckSize: originalDeck.count, mode: mode)
                 hasLoggedSession = true
+            }
+        }
+        .onDisappear {
+            // Flush any pending buffered logs when leaving the view
+            Task { @MainActor in
+                logger.flushPendingLogs()
             }
         }
     }
