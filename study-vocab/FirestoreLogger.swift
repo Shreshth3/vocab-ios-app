@@ -114,6 +114,81 @@ class FirestoreLogger {
         )
     }
 
+    /// Fetch review records for given card prompts from Firestore
+    /// - Parameter prompts: Array of card prompts to query
+    /// - Returns: Array of dictionaries containing the fetched review records
+    func fetchReviewRecords(for prompts: [String]) async -> [[String: Any]] {
+        guard !prompts.isEmpty else {
+            #if DEBUG
+            print("[FirestoreLogger] No prompts provided for fetch")
+            #endif
+            return []
+        }
+
+        var allResults: [[String: Any]] = []
+
+        // Firestore's 'in' operator supports max 30 items, so batch the queries
+        let batchSize = 30
+        let batches = stride(from: 0, to: prompts.count, by: batchSize).map {
+            Array(prompts[$0..<min($0 + batchSize, prompts.count)])
+        }
+
+        #if DEBUG
+        print("[FirestoreLogger] Fetching review records for \(prompts.count) prompts in \(batches.count) batch(es)")
+
+        // DEBUG: Test query without mode filter for first batch only
+        if !batches.isEmpty {
+            let firstBatch = batches[0]
+            print("[FirestoreLogger] DEBUG - Testing first batch without mode filter...")
+            print("[FirestoreLogger] DEBUG - First batch prompts: \(firstBatch)")
+            do {
+                let testQuery = try await db.collection("user_actions")
+                    .whereField("cardPrompt", in: firstBatch)
+                    .getDocuments()
+                print("[FirestoreLogger] DEBUG - Found \(testQuery.documents.count) records WITHOUT mode filter")
+                if !testQuery.documents.isEmpty {
+                    let firstDoc = testQuery.documents[0].data()
+                    print("[FirestoreLogger] DEBUG - First record mode: \(firstDoc["mode"] ?? "nil")")
+                    print("[FirestoreLogger] DEBUG - First record cardPrompt: \(firstDoc["cardPrompt"] ?? "nil")")
+                }
+            } catch {
+                print("[FirestoreLogger] DEBUG - Error in test query: \(error.localizedDescription)")
+            }
+        }
+        #endif
+
+        for (index, batch) in batches.enumerated() {
+            do {
+                let querySnapshot = try await db.collection("user_actions")
+                    .whereField("mode", isEqualTo: "review")
+                    .whereField("cardPrompt", in: batch)
+                    .getDocuments()
+
+                let batchResults = querySnapshot.documents.map { document in
+                    var data = document.data()
+                    data["documentID"] = document.documentID
+                    return data
+                }
+
+                allResults.append(contentsOf: batchResults)
+
+                #if DEBUG
+                print("[FirestoreLogger] Batch \(index + 1)/\(batches.count): Fetched \(batchResults.count) records")
+                #endif
+            } catch {
+                #if DEBUG
+                print("[FirestoreLogger] Error fetching batch \(index + 1): \(error.localizedDescription)")
+                #endif
+            }
+        }
+
+        #if DEBUG
+        print("[FirestoreLogger] Total records fetched: \(allResults.count)")
+        #endif
+
+        return allResults
+    }
+
     // MARK: - Private Helper Methods
 
     private func logAction(

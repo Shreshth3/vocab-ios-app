@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct MainView: View {
     @State private var folderURL: URL? = nil
@@ -9,6 +10,7 @@ struct MainView: View {
     @State private var navigateToMerged = false
     @State private var mergedDeck: [(prompt: String, translation: String)]? = nil
     @State private var currentMode: String = "study"
+    @State private var isLoadingReviewData = false
 
     // MARK: – Default folder
     // Prefer a bundled folder reference named "vocab-lists" (wired in the Xcode project)
@@ -76,22 +78,47 @@ struct MainView: View {
                     // Bottom actions: review and start studying
                     HStack(spacing: 12) {
                         Button("Review") {
-                            startMergedStudy(mode: "review")
+                            Task {
+                                await startMergedStudy(mode: "review")
+                            }
                         }
                         .buttonStyle(PressableAccentButtonStyle())
-                        .disabled(selectedFileURLs.isEmpty)
-                        .opacity(selectedFileURLs.isEmpty ? 0.6 : 1)
+                        .disabled(selectedFileURLs.isEmpty || isLoadingReviewData)
+                        .opacity(selectedFileURLs.isEmpty || isLoadingReviewData ? 0.6 : 1)
 
                         Button("Start Studying") {
-                            startMergedStudy(mode: "study")
+                            Task {
+                                await startMergedStudy(mode: "study")
+                            }
                         }
                         .buttonStyle(PressableAccentButtonStyle(backgroundColor: .blue))
-                        .disabled(selectedFileURLs.isEmpty)
-                        .opacity(selectedFileURLs.isEmpty ? 0.6 : 1)
+                        .disabled(selectedFileURLs.isEmpty || isLoadingReviewData)
+                        .opacity(selectedFileURLs.isEmpty || isLoadingReviewData ? 0.6 : 1)
                     }
                     .padding(.bottom)
                 }
                 .padding(.top)
+
+                // Loading indicator overlay
+                if isLoadingReviewData {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+
+                            Text("Fetching review data...")
+                                .foregroundColor(.white)
+                                .font(.headline)
+                        }
+                        .padding(32)
+                        .background(Color(red: 45/255, green: 45/255, blue: 45/255))
+                        .cornerRadius(16)
+                    }
+                }
             }
         }
         .onAppear {
@@ -209,7 +236,11 @@ struct MainView: View {
         }
     }
 
-    private func startMergedStudy(mode: String = "study") {
+    private func startMergedStudy(mode: String = "study") async {
+        // Set loading state
+        isLoadingReviewData = true
+        defer { isLoadingReviewData = false }
+
         // Ensure deterministic order by using current file list order
         let chosen = fileURLs.filter { selectedFileURLs.contains($0) }
         var combined: [(prompt: String, translation: String)] = []
@@ -219,6 +250,58 @@ struct MainView: View {
             }
         }
         guard !combined.isEmpty else { return }
+
+        // If mode is "review", fetch historical review data from Firebase
+        if mode == "review" {
+            let prompts = combined.map { $0.prompt }
+
+            #if DEBUG
+            print("[MainView] Fetching review records for \(prompts.count) prompts...")
+            print("[MainView] First 10 prompts: \(prompts.prefix(10))")
+            print("[MainView] Searching for mode='review' AND cardPrompt in deck")
+            #endif
+
+            let reviewRecords = await FirestoreLogger.shared.fetchReviewRecords(for: prompts)
+
+            #if DEBUG
+            print(String(repeating: "=", count: 80))
+            print("[MainView] Fetched \(reviewRecords.count) review records")
+            print(String(repeating: "=", count: 80))
+
+            // Print each record with formatted output
+            for (index, record) in reviewRecords.enumerated() {
+                print("\nRecord #\(index + 1):")
+                print("  Document ID: \(record["documentID"] ?? "N/A")")
+                print("  Type: \(record["type"] ?? "N/A")")
+                print("  Card Prompt: \(record["cardPrompt"] ?? "N/A")")
+                print("  Card Translation: \(record["cardTranslation"] ?? "N/A")")
+                print("  Mode: \(record["mode"] ?? "N/A")")
+
+                if let timestamp = record["timestamp"] as? Timestamp {
+                    print("  Timestamp: \(timestamp.dateValue())")
+                }
+
+                if let sessionID = record["sessionID"] {
+                    print("  Session ID: \(sessionID)")
+                }
+
+                if let correctCount = record["correctCount"] {
+                    print("  Correct Count: \(correctCount)")
+                }
+
+                if let wrongCount = record["wrongCount"] {
+                    print("  Wrong Count: \(wrongCount)")
+                }
+
+                print(String(repeating: "-", count: 80))
+            }
+
+            print("\n" + String(repeating: "=", count: 80))
+            print("[MainView] Finished displaying review records")
+            print(String(repeating: "=", count: 80) + "\n")
+            #endif
+        }
+
         mergedDeck = combined
         currentMode = mode
         navigateToMerged = true
