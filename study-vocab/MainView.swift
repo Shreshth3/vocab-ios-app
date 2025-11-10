@@ -1,16 +1,14 @@
 import SwiftUI
-import UniformTypeIdentifiers   // Needed for .fileImporter
 
 struct MainView: View {
-    @State private var showingImporter = false
     @State private var folderURL: URL? = nil
     @State private var fileURLs: [URL] = []
     @State private var selectedFileURLs: Set<URL> = []
-    @State private var folderAccessGranted = false
     @State private var attemptedDefaultImport = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var navigateToMerged = false
     @State private var mergedDeck: [(prompt: String, translation: String)]? = nil
+    @State private var currentMode: String = "study"
 
     // MARK: – Default folder
     // Prefer a bundled folder reference named "vocab-lists" (wired in the Xcode project)
@@ -30,7 +28,7 @@ struct MainView: View {
                     // Hidden navigation for merged study session
                     NavigationLink(isActive: $navigateToMerged) {
                         if let deck = mergedDeck {
-                            ContentView(deck: deck)
+                            ContentView(deck: deck, mode: currentMode)
                         } else {
                             Text("")
                         }
@@ -75,15 +73,17 @@ struct MainView: View {
                             .padding(.top)
                     }
 
-                    // Bottom actions: choose folder and start studying
+                    // Bottom actions: review and start studying
                     HStack(spacing: 12) {
-                        Button("Choose Folder") {
-                            showingImporter = true
+                        Button("Review") {
+                            startMergedStudy(mode: "review")
                         }
                         .buttonStyle(PressableAccentButtonStyle())
+                        .disabled(selectedFileURLs.isEmpty)
+                        .opacity(selectedFileURLs.isEmpty ? 0.6 : 1)
 
                         Button("Start Studying") {
-                            startMergedStudy()
+                            startMergedStudy(mode: "study")
                         }
                         .buttonStyle(PressableAccentButtonStyle(backgroundColor: .blue))
                         .disabled(selectedFileURLs.isEmpty)
@@ -92,28 +92,6 @@ struct MainView: View {
                     .padding(.bottom)
                 }
                 .padding(.top)
-            }
-            // MARK: – Folder picker (iCloud / Files)
-            .fileImporter(isPresented: $showingImporter,
-                          allowedContentTypes: [.folder],
-                          allowsMultipleSelection: false) { result in
-                switch result {
-                case .success(let urls):
-                    if let url = urls.first {
-                        // Stop access to previously chosen folder, if any
-                        if folderAccessGranted, let previous = folderURL {
-                            previous.stopAccessingSecurityScopedResource()
-                            folderAccessGranted = false
-                        }
-
-                        folderURL = url
-                        folderAccessGranted = url.startAccessingSecurityScopedResource()
-
-                        loadFiles(from: url)
-                    }
-                case .failure(let error):
-                    print("Folder import failed:", error.localizedDescription)
-                }
             }
         }
         .onAppear {
@@ -231,7 +209,7 @@ struct MainView: View {
         }
     }
 
-    private func startMergedStudy() {
+    private func startMergedStudy(mode: String = "study") {
         // Ensure deterministic order by using current file list order
         let chosen = fileURLs.filter { selectedFileURLs.contains($0) }
         var combined: [(prompt: String, translation: String)] = []
@@ -242,6 +220,7 @@ struct MainView: View {
         }
         guard !combined.isEmpty else { return }
         mergedDeck = combined
+        currentMode = mode
         navigateToMerged = true
     }
 }

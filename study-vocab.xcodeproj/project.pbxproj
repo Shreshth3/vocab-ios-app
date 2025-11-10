@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		67B525612EC1AF8200664552 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 67B525602EC1AF8200664552 /* FirebaseCore */; };
+		67B525632EC1AF8200664552 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 67B525622EC1AF8200664552 /* FirebaseFirestore */; };
 		67DF450C2DB3B92E00390CD5 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 67DF450B2DB3B92E00390CD5 /* LaunchScreen.storyboard */; };
 		67DF45122DB3BA2000390CD5 /* vocab-lists in Resources */ = {isa = PBXBuildFile; fileRef = 67DF45112DB3BA2000390CD5 /* vocab-lists */; };
 /* End PBXBuildFile section */
@@ -59,6 +61,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				67B525612EC1AF8200664552 /* FirebaseCore in Frameworks */,
+				67B525632EC1AF8200664552 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -121,6 +125,8 @@
 			);
 			name = "study-vocab";
 			packageProductDependencies = (
+				67B525602EC1AF8200664552 /* FirebaseCore */,
+				67B525622EC1AF8200664552 /* FirebaseFirestore */,
 			);
 			productName = "study-vocab";
 			productReference = 67767DA92DB2889C009656CC /* study-vocab.app */;
@@ -204,6 +210,9 @@
 			);
 			mainGroup = 67767DA02DB2889C009656CC;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				67B5255F2EC1AF8200664552 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 67767DAA2DB2889C009656CC /* Products */;
 			projectDirPath = "";
@@ -575,6 +584,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		67B5255F2EC1AF8200664552 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.5.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		67B525602EC1AF8200664552 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 67B5255F2EC1AF8200664552 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		67B525622EC1AF8200664552 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 67B5255F2EC1AF8200664552 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 67767DA12DB2889C009656CC /* Project object */;
 }

@@ -6,14 +6,17 @@
 //
 
 import SwiftUI
+import FirebaseCore
 
 @main
 struct study_vocabApp: App {
-    #if DEBUG
     init() {
-        print("[App] init – starting study-vocab")
+        FirebaseApp.configure()
+        #if DEBUG
+        print("[App] init – starting study-vocab with Firebase")
+        #endif
     }
-    #endif
+
     var body: some Scene {
         WindowGroup {
             MainView()          // instead of ContentView()

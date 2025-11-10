@@ -34,9 +34,12 @@ struct PressableAccentButtonStyle: ButtonStyle {
 struct ContentView: View {
     // Provide the initial deck via the initializer
     private let originalDeck: [(prompt: String, translation: String)]
+    private let mode: String
+    private let logger = FirestoreLogger.shared
 
-    init(deck: [(prompt: String, translation: String)]) {
+    init(deck: [(prompt: String, translation: String)], mode: String = "study") {
         self.originalDeck = deck
+        self.mode = mode
         _deck = State(initialValue: deck.shuffled())
     }
 
@@ -45,6 +48,7 @@ struct ContentView: View {
     @State private var currentIndex = 0
     @State private var correctCards: [(prompt: String, translation: String)] = []
     @State private var wrongCards: [(prompt: String, translation: String)] = []
+    @State private var hasLoggedSession = false
 
     private var currentCard: (prompt: String, translation: String) {
         deck[currentIndex]
@@ -72,6 +76,9 @@ struct ContentView: View {
                 HStack {
                     Spacer()
                     Button {
+                        // Log restart action
+                        logger.logRestart(deckSize: originalDeck.count, mode: mode)
+
                         deck = originalDeck.shuffled()
                         currentIndex = 0
                         correctCards = []
@@ -106,7 +113,20 @@ struct ContentView: View {
 
                         HStack(spacing: 50) {
                             Button(action: {
-                                wrongCards.append(currentCard)
+                                let card = currentCard
+                                wrongCards.append(card)
+
+                                // Log the incorrect action
+                                logger.logCardIncorrect(
+                                    prompt: card.prompt,
+                                    translation: card.translation,
+                                    currentIndex: currentIndex,
+                                    deckSize: deck.count,
+                                    correctCount: correctCards.count,
+                                    wrongCount: wrongCards.count,
+                                    mode: mode
+                                )
+
                                 showTranslation = false
                                 currentIndex += 1
                             }) {
@@ -117,7 +137,20 @@ struct ContentView: View {
                                     .clipShape(Circle())
                             }
                             Button(action: {
-                                correctCards.append(currentCard)
+                                let card = currentCard
+                                correctCards.append(card)
+
+                                // Log the correct action
+                                logger.logCardCorrect(
+                                    prompt: card.prompt,
+                                    translation: card.translation,
+                                    currentIndex: currentIndex,
+                                    deckSize: deck.count,
+                                    correctCount: correctCards.count,
+                                    wrongCount: wrongCards.count,
+                                    mode: mode
+                                )
+
                                 showTranslation = false
                                 currentIndex += 1
                             }) {
@@ -138,6 +171,11 @@ struct ContentView: View {
                             Text("All words correct! 🎉")
                         } else {
                             Button("Mistakes") {
+                                let mistakeCount = wrongCards.count
+
+                                // Log study mistakes action
+                                logger.logStudyMistakes(mistakeCount: mistakeCount, mode: mode)
+
                                 deck = wrongCards.shuffled()
                                 correctCards = []
                                 wrongCards = []
@@ -162,6 +200,16 @@ struct ContentView: View {
                             } else if let idx = wrongCards.lastIndex(where: { $0.prompt == card.prompt && $0.translation == card.translation }) {
                                 wrongCards.remove(at: idx)
                             }
+
+                            // Log undo action
+                            logger.logUndo(
+                                currentIndex: currentIndex,
+                                deckSize: deck.count,
+                                correctCount: correctCards.count,
+                                wrongCount: wrongCards.count,
+                                mode: mode
+                            )
+
                             showTranslation = false
                         }
                     } label: {
@@ -173,6 +221,11 @@ struct ContentView: View {
                     .disabled(currentIndex == 0)
                     .opacity(currentIndex == 0 ? 0.5 : 1)
                     Button("Mistakes") {
+                        let mistakeCount = wrongCards.count
+
+                        // Log study mistakes action
+                        logger.logStudyMistakes(mistakeCount: mistakeCount, mode: mode)
+
                         deck = wrongCards.shuffled()
                         correctCards = []
                         wrongCards = []
@@ -184,6 +237,13 @@ struct ContentView: View {
                     .disabled(wrongCards.isEmpty)
                     .opacity(wrongCards.isEmpty ? 0.5 : 1)
                 }
+            }
+        }
+        .onAppear {
+            // Log session start only once
+            if !hasLoggedSession {
+                logger.logSessionStart(deckSize: originalDeck.count, mode: mode)
+                hasLoggedSession = true
             }
         }
     }
