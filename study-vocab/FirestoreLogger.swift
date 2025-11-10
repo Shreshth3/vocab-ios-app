@@ -125,68 +125,64 @@ class FirestoreLogger {
             return []
         }
 
-        var allResults: [[String: Any]] = []
-
-        // Firestore's 'in' operator supports max 30 items, so batch the queries
-        let batchSize = 30
-        let batches = stride(from: 0, to: prompts.count, by: batchSize).map {
-            Array(prompts[$0..<min($0 + batchSize, prompts.count)])
-        }
+        // Create a Set for O(1) lookup when filtering
+        let promptSet = Set(prompts)
 
         #if DEBUG
-        print("[FirestoreLogger] Fetching review records for \(prompts.count) prompts in \(batches.count) batch(es)")
-
-        // DEBUG: Test query without mode filter for first batch only
-        if !batches.isEmpty {
-            let firstBatch = batches[0]
-            print("[FirestoreLogger] DEBUG - Testing first batch without mode filter...")
-            print("[FirestoreLogger] DEBUG - First batch prompts: \(firstBatch)")
-            do {
-                let testQuery = try await db.collection("user_actions")
-                    .whereField("cardPrompt", in: firstBatch)
-                    .getDocuments()
-                print("[FirestoreLogger] DEBUG - Found \(testQuery.documents.count) records WITHOUT mode filter")
-                if !testQuery.documents.isEmpty {
-                    let firstDoc = testQuery.documents[0].data()
-                    print("[FirestoreLogger] DEBUG - First record mode: \(firstDoc["mode"] ?? "nil")")
-                    print("[FirestoreLogger] DEBUG - First record cardPrompt: \(firstDoc["cardPrompt"] ?? "nil")")
-                }
-            } catch {
-                print("[FirestoreLogger] DEBUG - Error in test query: \(error.localizedDescription)")
-            }
-        }
+        print("[FirestoreLogger] Fetching all review records from Firestore...")
+        print("[FirestoreLogger] Will filter locally for \(prompts.count) prompts")
+        print("[FirestoreLogger] First 10 prompts to match: \(Array(prompts.prefix(10)))")
         #endif
 
-        for (index, batch) in batches.enumerated() {
-            do {
-                let querySnapshot = try await db.collection("user_actions")
-                    .whereField("mode", isEqualTo: "review")
-                    .whereField("cardPrompt", in: batch)
-                    .getDocuments()
+        do {
+            // Fetch ALL review records in a single query (no batching needed)
+            let querySnapshot = try await db.collection("user_actions")
+                .whereField("mode", isEqualTo: "review")
+                .getDocuments()
 
-                let batchResults = querySnapshot.documents.map { document in
-                    var data = document.data()
-                    data["documentID"] = document.documentID
-                    return data
+            #if DEBUG
+            print("[FirestoreLogger] Fetched \(querySnapshot.documents.count) total review records from database")
+
+            // Debug: Show sample records if any exist
+            if !querySnapshot.documents.isEmpty {
+                print("[FirestoreLogger] Sample records from database:")
+                for (index, doc) in querySnapshot.documents.prefix(5).enumerated() {
+                    let data = doc.data()
+                    print("  Record \(index + 1):")
+                    print("    cardPrompt: \(data["cardPrompt"] ?? "nil")")
+                    print("    mode: \(data["mode"] ?? "nil")")
+                    print("    type: \(data["type"] ?? "nil")")
+                }
+            } else {
+                print("[FirestoreLogger] No review records found in database")
+            }
+            #endif
+
+            // Filter locally to only records matching our deck
+            let filteredResults = querySnapshot.documents.compactMap { document -> [String: Any]? in
+                var data = document.data()
+
+                // Check if this record's cardPrompt is in our deck
+                guard let cardPrompt = data["cardPrompt"] as? String,
+                      promptSet.contains(cardPrompt) else {
+                    return nil
                 }
 
-                allResults.append(contentsOf: batchResults)
-
-                #if DEBUG
-                print("[FirestoreLogger] Batch \(index + 1)/\(batches.count): Fetched \(batchResults.count) records")
-                #endif
-            } catch {
-                #if DEBUG
-                print("[FirestoreLogger] Error fetching batch \(index + 1): \(error.localizedDescription)")
-                #endif
+                data["documentID"] = document.documentID
+                return data
             }
+
+            #if DEBUG
+            print("[FirestoreLogger] Filtered to \(filteredResults.count) records matching the selected deck")
+            #endif
+
+            return filteredResults
+        } catch {
+            #if DEBUG
+            print("[FirestoreLogger] Error fetching review records: \(error.localizedDescription)")
+            #endif
+            return []
         }
-
-        #if DEBUG
-        print("[FirestoreLogger] Total records fetched: \(allResults.count)")
-        #endif
-
-        return allResults
     }
 
     // MARK: - Private Helper Methods
