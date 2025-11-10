@@ -43,13 +43,7 @@ struct MainView: View {
                         ScrollView {
                             VStack(spacing: 12) {
                                 ForEach(fileURLs, id: \.self) { url in
-                                    NavigationLink {
-                                        if let deck = parseVocabularyFile(at: url) {
-                                            ContentView(deck: deck)
-                                        } else {
-                                            Text("Failed to load file")
-                                        }
-                                    } label: {
+                                    NavigationLink(value: url) {
                                         HStack(spacing: 12) {
                                             Button(action: {
                                                 toggleSelection(for: url)
@@ -79,6 +73,13 @@ struct MainView: View {
                     // Bottom actions: review and start studying
                     HStack(spacing: 12) {
                         Button("Review") {
+                            #if DEBUG
+                            print("\n[MainView] Review button pressed!")
+                            print("[MainView] selectedFileURLs.count = \(selectedFileURLs.count)")
+                            for url in selectedFileURLs {
+                                print("[MainView]   - \(url.lastPathComponent)")
+                            }
+                            #endif
                             Task {
                                 await startMergedStudy(mode: "review")
                             }
@@ -88,6 +89,13 @@ struct MainView: View {
                         .opacity(selectedFileURLs.isEmpty || isLoadingReviewData ? 0.6 : 1)
 
                         Button("Start Studying") {
+                            #if DEBUG
+                            print("\n[MainView] Start Studying button pressed!")
+                            print("[MainView] selectedFileURLs.count = \(selectedFileURLs.count)")
+                            for url in selectedFileURLs {
+                                print("[MainView]   - \(url.lastPathComponent)")
+                            }
+                            #endif
                             Task {
                                 await startMergedStudy(mode: "study")
                             }
@@ -120,6 +128,13 @@ struct MainView: View {
                         .cornerRadius(16)
                     }
                 }
+            }
+        }
+        .navigationDestination(for: URL.self) { url in
+            if let deck = parseVocabularyFile(at: url) {
+                ContentView(deck: deck)
+            } else {
+                Text("Failed to load file")
             }
         }
         .onAppear {
@@ -232,8 +247,14 @@ struct MainView: View {
     private func toggleSelection(for url: URL) {
         if selectedFileURLs.contains(url) {
             selectedFileURLs.remove(url)
+            #if DEBUG
+            print("[MainView] Deselected: \(url.lastPathComponent) | Total selected: \(selectedFileURLs.count)")
+            #endif
         } else {
             selectedFileURLs.insert(url)
+            #if DEBUG
+            print("[MainView] Selected: \(url.lastPathComponent) | Total selected: \(selectedFileURLs.count)")
+            #endif
         }
     }
 
@@ -244,6 +265,23 @@ struct MainView: View {
 
         // Ensure deterministic order by using current file list order
         let chosen = fileURLs.filter { selectedFileURLs.contains($0) }
+
+        #if DEBUG
+        print("\n" + String(repeating: "=", count: 80))
+        print("[MainView] startMergedStudy called with mode: \(mode)")
+        print("[MainView] Total files available: \(fileURLs.count)")
+        print("[MainView] Files selected: \(selectedFileURLs.count)")
+        print("[MainView] Selected file names:")
+        for url in selectedFileURLs {
+            print("  - \(url.lastPathComponent)")
+        }
+        print("[MainView] Chosen files (after filter): \(chosen.count)")
+        for url in chosen {
+            print("  - \(url.lastPathComponent)")
+        }
+        print(String(repeating: "=", count: 80) + "\n")
+        #endif
+
         var combined: [(prompt: String, translation: String)] = []
         for url in chosen {
             if let deck = parseVocabularyFile(at: url) {
