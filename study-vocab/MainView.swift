@@ -400,24 +400,14 @@ struct MainView: View {
                 wordScores[prompt] = score
             }
 
-            // Print scores
+            // Print summary statistics only (not all words to save space)
             #if DEBUG
             print("\n" + String(repeating: "=", count: 80))
-            print("[MainView] Word Scores (sorted by score, descending)")
+            print("[MainView] Word Score Summary")
             print(String(repeating: "=", count: 80))
-
-            let sortedScores = wordScores.sorted { $0.value > $1.value }
-            for (index, (prompt, score)) in sortedScores.enumerated() {
-                let stats = promptStats[prompt] ?? (correctCount: 0, wrongCount: 0)
-                print("\n\(index + 1). Prompt: \(prompt)")
-                print("   Score: \(String(format: "%.4f", score))")
-                print("   Wrong: \(stats.wrongCount), Correct: \(stats.correctCount)")
-            }
-
-            print("\n" + String(repeating: "=", count: 80))
-            print("[MainView] Total words: \(wordScores.count)")
-            print("[MainView] Words with score > 1.0: \(wordScores.values.filter { $0 > 1.0 }.count)")
-            print("[MainView] Average score: \(String(format: "%.4f", wordScores.values.reduce(0, +) / Double(wordScores.count)))")
+            print("Total words: \(wordScores.count)")
+            print("Words with score > 1.0: \(wordScores.values.filter { $0 > 1.0 }.count)")
+            print("Average score: \(String(format: "%.4f", wordScores.values.reduce(0, +) / Double(wordScores.count)))")
             print(String(repeating: "=", count: 80) + "\n")
             #endif
 
