@@ -24,41 +24,35 @@ class FirestoreLogger {
     }
 
     /// Log when user marks a card as correct
-    func logCardCorrect(prompt: String, translation: String, currentIndex: Int, deckSize: Int, correctCount: Int, wrongCount: Int, mode: String) {
+    func logCardCorrect(prompt: String, translation: String, currentIndex: Int, deckSize: Int, mode: String) {
         logAction(
             type: "card_correct",
             cardPrompt: prompt,
             cardTranslation: translation,
             currentIndex: currentIndex,
             deckSize: deckSize,
-            correctCount: correctCount,
-            wrongCount: wrongCount,
             mode: mode
         )
     }
 
     /// Log when user marks a card as incorrect
-    func logCardIncorrect(prompt: String, translation: String, currentIndex: Int, deckSize: Int, correctCount: Int, wrongCount: Int, mode: String) {
+    func logCardIncorrect(prompt: String, translation: String, currentIndex: Int, deckSize: Int, mode: String) {
         logAction(
             type: "card_incorrect",
             cardPrompt: prompt,
             cardTranslation: translation,
             currentIndex: currentIndex,
             deckSize: deckSize,
-            correctCount: correctCount,
-            wrongCount: wrongCount,
             mode: mode
         )
     }
 
     /// Log when user undoes their last action
-    func logUndo(currentIndex: Int, deckSize: Int, correctCount: Int, wrongCount: Int, mode: String) {
+    func logUndo(currentIndex: Int, deckSize: Int, mode: String) {
         logAction(
             type: "undo",
             currentIndex: currentIndex,
             deckSize: deckSize,
-            correctCount: correctCount,
-            wrongCount: wrongCount,
             mode: mode
         )
     }
@@ -68,8 +62,6 @@ class FirestoreLogger {
         logAction(
             type: "restart",
             deckSize: deckSize,
-            correctCount: 0,
-            wrongCount: 0,
             mode: mode
         )
     }
@@ -79,8 +71,6 @@ class FirestoreLogger {
         logAction(
             type: "study_mistakes",
             deckSize: mistakeCount,
-            correctCount: 0,
-            wrongCount: 0,
             mode: mode
         )
     }
@@ -103,12 +93,10 @@ class FirestoreLogger {
     }
 
     /// Log when user completes a deck or ends a session
-    func logSessionEnd(deckSize: Int, correctCount: Int, wrongCount: Int, completionRate: Double, mode: String) {
+    func logSessionEnd(deckSize: Int, completionRate: Double, mode: String) {
         logAction(
             type: "session_end",
             deckSize: deckSize,
-            correctCount: correctCount,
-            wrongCount: wrongCount,
             mode: mode,
             additionalData: ["completionRate": completionRate]
         )
@@ -193,8 +181,6 @@ class FirestoreLogger {
         cardTranslation: String? = nil,
         currentIndex: Int? = nil,
         deckSize: Int,
-        correctCount: Int,
-        wrongCount: Int,
         mode: String,
         additionalData: [String: Any]? = nil
     ) {
@@ -203,8 +189,6 @@ class FirestoreLogger {
             "timestamp": Timestamp(date: Date()),
             "sessionID": sessionID,
             "deckSize": deckSize,
-            "correctCount": correctCount,
-            "wrongCount": wrongCount,
             "mode": mode
         ]
 

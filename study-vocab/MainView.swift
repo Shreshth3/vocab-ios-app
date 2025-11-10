@@ -11,6 +11,7 @@ struct MainView: View {
     @State private var mergedDeck: [(prompt: String, translation: String)]? = nil
     @State private var currentMode: String = "study"
     @State private var isLoadingReviewData = false
+    @State private var wordProbabilities: [String: Double]? = nil
 
     // MARK: – Default folder
     // Prefer a bundled folder reference named "vocab-lists" (wired in the Xcode project)
@@ -30,7 +31,7 @@ struct MainView: View {
                     // Hidden navigation for merged study session
                     NavigationLink(isActive: $navigateToMerged) {
                         if let deck = mergedDeck {
-                            ContentView(deck: deck, mode: currentMode)
+                            ContentView(deck: deck, mode: currentMode, wordProbabilities: wordProbabilities)
                         } else {
                             Text("")
                         }
@@ -381,6 +382,36 @@ struct MainView: View {
             print("[MainView] Average score: \(String(format: "%.4f", wordScores.values.reduce(0, +) / Double(wordScores.count)))")
             print(String(repeating: "=", count: 80) + "\n")
             #endif
+
+            // Calculate probability distribution from scores
+            let totalScore = wordScores.values.reduce(0, +)
+            var probabilities: [String: Double] = [:]
+
+            for (prompt, score) in wordScores {
+                probabilities[prompt] = score / totalScore
+            }
+
+            wordProbabilities = probabilities
+
+            #if DEBUG
+            print("\n" + String(repeating: "=", count: 80))
+            print("[MainView] Probability Distribution (top 10 by probability)")
+            print(String(repeating: "=", count: 80))
+
+            let sortedProbs = probabilities.sorted { $0.value > $1.value }.prefix(10)
+            for (index, (prompt, prob)) in sortedProbs.enumerated() {
+                print("\n\(index + 1). Prompt: \(prompt)")
+                print("   Probability: \(String(format: "%.4f", prob)) (\(String(format: "%.2f", prob * 100))%)")
+                print("   Score: \(String(format: "%.4f", wordScores[prompt] ?? 0))")
+            }
+
+            print("\n" + String(repeating: "=", count: 80))
+            print("[MainView] Total probability sum: \(String(format: "%.6f", probabilities.values.reduce(0, +)))")
+            print(String(repeating: "=", count: 80) + "\n")
+            #endif
+        } else {
+            // Study mode - no probabilities
+            wordProbabilities = nil
         }
 
         mergedDeck = combined

@@ -35,12 +35,99 @@ struct ContentView: View {
     // Provide the initial deck via the initializer
     private let originalDeck: [(prompt: String, translation: String)]
     private let mode: String
+    private let wordProbabilities: [String: Double]?
     private let logger = FirestoreLogger.shared
 
-    init(deck: [(prompt: String, translation: String)], mode: String = "study") {
+    // MARK: - Weighted Random Selection
+    /// Selects words from the deck based on probability distribution
+    /// Uses cumulative distribution and binary search for efficient sampling
+    static func selectWordsByProbability(
+        deck: [(prompt: String, translation: String)],
+        probabilities: [String: Double]
+    ) -> [(prompt: String, translation: String)] {
+        guard !deck.isEmpty else { return [] }
+
+        // Create array of (word, probability) pairs
+        var wordProbs: [(word: (prompt: String, translation: String), prob: Double)] = []
+        for word in deck {
+            let prob = probabilities[word.prompt] ?? (1.0 / Double(deck.count))
+            wordProbs.append((word: word, prob: prob))
+        }
+
+        // Build cumulative distribution
+        var cumulativeDistribution: [Double] = []
+        var cumulative: Double = 0.0
+
+        for item in wordProbs {
+            cumulative += item.prob
+            cumulativeDistribution.append(cumulative)
+        }
+
+        // Sample words with replacement based on probabilities
+        var selectedDeck: [(prompt: String, translation: String)] = []
+
+        for _ in 0..<deck.count {
+            let randomValue = Double.random(in: 0..<1.0)
+
+            // Binary search in cumulative distribution
+            var left = 0
+            var right = cumulativeDistribution.count - 1
+            var selectedIndex = 0
+
+            while left <= right {
+                let mid = (left + right) / 2
+                let cumulativeProb = cumulativeDistribution[mid]
+
+                if randomValue < cumulativeProb {
+                    selectedIndex = mid
+                    right = mid - 1
+                } else {
+                    left = mid + 1
+                }
+            }
+
+            selectedDeck.append(wordProbs[selectedIndex].word)
+        }
+
+        #if DEBUG
+        // Log distribution statistics
+        var wordCounts: [String: Int] = [:]
+        for word in selectedDeck {
+            wordCounts[word.prompt, default: 0] += 1
+        }
+
+        print("\n" + String(repeating: "=", count: 80))
+        print("[ContentView] Probability-Based Deck Selection")
+        print("Total cards: \(selectedDeck.count)")
+        print("Unique cards: \(wordCounts.count)")
+        print(String(repeating: "=", count: 80))
+
+        let sortedCounts = wordCounts.sorted { $0.value > $1.value }.prefix(10)
+        print("\nTop 10 most frequent words in deck:")
+        for (index, (prompt, count)) in sortedCounts.enumerated() {
+            let prob = probabilities[prompt] ?? 0
+            let expectedCount = prob * Double(deck.count)
+            print("\(index + 1). \(prompt)")
+            print("   Actual: \(count) occurrences (\(String(format: "%.1f", Double(count) / Double(deck.count) * 100))%)")
+            print("   Expected: \(String(format: "%.1f", expectedCount)) (\(String(format: "%.1f", prob * 100))%)")
+        }
+        print(String(repeating: "=", count: 80) + "\n")
+        #endif
+
+        return selectedDeck
+    }
+
+    init(deck: [(prompt: String, translation: String)], mode: String = "study", wordProbabilities: [String: Double]? = nil) {
         self.originalDeck = deck
         self.mode = mode
-        _deck = State(initialValue: deck.shuffled())
+        self.wordProbabilities = wordProbabilities
+
+        // Use probability-based selection for review mode, uniform random for study mode
+        if let probabilities = wordProbabilities {
+            _deck = State(initialValue: Self.selectWordsByProbability(deck: deck, probabilities: probabilities))
+        } else {
+            _deck = State(initialValue: deck.shuffled())
+        }
     }
 
     @State private var showTranslation = false
@@ -49,9 +136,14 @@ struct ContentView: View {
     @State private var correctCards: [(prompt: String, translation: String)] = []
     @State private var wrongCards: [(prompt: String, translation: String)] = []
     @State private var hasLoggedSession = false
+    @State private var isReviewingMistakes = false
 
     private var currentCard: (prompt: String, translation: String) {
         deck[currentIndex]
+    }
+
+    private var shouldLog: Bool {
+        mode == "review" && !isReviewingMistakes
     }
 
     var body: some View {
@@ -77,13 +169,16 @@ struct ContentView: View {
                     Spacer()
                     Button {
                         // Log restart action
-                        logger.logRestart(deckSize: originalDeck.count, mode: mode)
+                        if shouldLog {
+                            logger.logRestart(deckSize: originalDeck.count, mode: mode)
+                        }
 
                         deck = originalDeck.shuffled()
                         currentIndex = 0
                         correctCards = []
                         wrongCards = []
                         showTranslation = false
+                        isReviewingMistakes = false
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .foregroundColor(.white)
@@ -117,15 +212,15 @@ struct ContentView: View {
                                 wrongCards.append(card)
 
                                 // Log the incorrect action
-                                logger.logCardIncorrect(
-                                    prompt: card.prompt,
-                                    translation: card.translation,
-                                    currentIndex: currentIndex,
-                                    deckSize: deck.count,
-                                    correctCount: correctCards.count,
-                                    wrongCount: wrongCards.count,
-                                    mode: mode
-                                )
+                                if shouldLog {
+                                    logger.logCardIncorrect(
+                                        prompt: card.prompt,
+                                        translation: card.translation,
+                                        currentIndex: currentIndex,
+                                        deckSize: deck.count,
+                                        mode: mode
+                                    )
+                                }
 
                                 showTranslation = false
                                 currentIndex += 1
@@ -141,15 +236,15 @@ struct ContentView: View {
                                 correctCards.append(card)
 
                                 // Log the correct action
-                                logger.logCardCorrect(
-                                    prompt: card.prompt,
-                                    translation: card.translation,
-                                    currentIndex: currentIndex,
-                                    deckSize: deck.count,
-                                    correctCount: correctCards.count,
-                                    wrongCount: wrongCards.count,
-                                    mode: mode
-                                )
+                                if shouldLog {
+                                    logger.logCardCorrect(
+                                        prompt: card.prompt,
+                                        translation: card.translation,
+                                        currentIndex: currentIndex,
+                                        deckSize: deck.count,
+                                        mode: mode
+                                    )
+                                }
 
                                 showTranslation = false
                                 currentIndex += 1
@@ -174,13 +269,16 @@ struct ContentView: View {
                                 let mistakeCount = wrongCards.count
 
                                 // Log study mistakes action
-                                logger.logStudyMistakes(mistakeCount: mistakeCount, mode: mode)
+                                if shouldLog {
+                                    logger.logStudyMistakes(mistakeCount: mistakeCount, mode: mode)
+                                }
 
                                 deck = wrongCards.shuffled()
                                 correctCards = []
                                 wrongCards = []
                                 currentIndex = 0
                                 showTranslation = false
+                                isReviewingMistakes = true
                             }
                             .buttonStyle(PressableAccentButtonStyle())
                         }
@@ -202,13 +300,13 @@ struct ContentView: View {
                             }
 
                             // Log undo action
-                            logger.logUndo(
-                                currentIndex: currentIndex,
-                                deckSize: deck.count,
-                                correctCount: correctCards.count,
-                                wrongCount: wrongCards.count,
-                                mode: mode
-                            )
+                            if shouldLog {
+                                logger.logUndo(
+                                    currentIndex: currentIndex,
+                                    deckSize: deck.count,
+                                    mode: mode
+                                )
+                            }
 
                             showTranslation = false
                         }
@@ -224,13 +322,16 @@ struct ContentView: View {
                         let mistakeCount = wrongCards.count
 
                         // Log study mistakes action
-                        logger.logStudyMistakes(mistakeCount: mistakeCount, mode: mode)
+                        if shouldLog {
+                            logger.logStudyMistakes(mistakeCount: mistakeCount, mode: mode)
+                        }
 
                         deck = wrongCards.shuffled()
                         correctCards = []
                         wrongCards = []
                         currentIndex = 0
                         showTranslation = false
+                        isReviewingMistakes = true
                     }
                     .buttonStyle(PressableAccentButtonStyle())
                     .padding(.horizontal, 8)
@@ -241,7 +342,7 @@ struct ContentView: View {
         }
         .onAppear {
             // Log session start only once
-            if !hasLoggedSession {
+            if !hasLoggedSession && shouldLog {
                 logger.logSessionStart(deckSize: originalDeck.count, mode: mode)
                 hasLoggedSession = true
             }
