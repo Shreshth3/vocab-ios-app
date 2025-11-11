@@ -12,6 +12,8 @@ struct MainView: View {
     @State private var currentMode: String = "study"
     @State private var isLoadingReviewData = false
     @State private var wordProbabilities: [String: Double]? = nil
+    @State private var navigateToList = false
+    @State private var listDeck: [(prompt: String, translation: String)]? = nil
 
     // MARK: – Default folder
     // Prefer a bundled folder reference named "vocab-lists" (wired in the Xcode project)
@@ -32,6 +34,16 @@ struct MainView: View {
                     NavigationLink(isActive: $navigateToMerged) {
                         if let deck = mergedDeck {
                             ContentView(deck: deck, mode: currentMode, wordProbabilities: wordProbabilities)
+                        } else {
+                            Text("")
+                        }
+                    } label: { EmptyView() }
+                    .hidden()
+
+                    // Hidden navigation for vocabulary list view
+                    NavigationLink(isActive: $navigateToList) {
+                        if let deck = listDeck {
+                            VocabularyListView(deck: deck)
                         } else {
                             Text("")
                         }
@@ -70,8 +82,22 @@ struct MainView: View {
                             .padding(.top)
                     }
 
+                    // View List button (aligned to the right)
+                    HStack {
+                        Spacer()
+                        Button("View List") {
+                            viewList()
+                        }
+                        .buttonStyle(PressableAccentButtonStyle())
+                        .disabled(selectedFileURLs.isEmpty)
+                        .opacity(selectedFileURLs.isEmpty ? 0.6 : 1)
+                    }
+                    .padding(.horizontal)
+
                     // Bottom actions: review and start studying
                     HStack(spacing: 12) {
+                        Spacer()
+
                         Button("Review") {
                             #if DEBUG
                             print("\n[MainView] Review button pressed!")
@@ -104,6 +130,7 @@ struct MainView: View {
                         .disabled(selectedFileURLs.isEmpty || isLoadingReviewData)
                         .opacity(selectedFileURLs.isEmpty || isLoadingReviewData ? 0.6 : 1)
                     }
+                    .padding(.horizontal)
                     .padding(.bottom)
                 }
                 .padding(.top)
@@ -445,6 +472,31 @@ struct MainView: View {
         mergedDeck = combined
         currentMode = mode
         navigateToMerged = true
+    }
+
+    private func viewList() {
+        // Ensure deterministic order by using current file list order
+        let chosen = fileURLs.filter { selectedFileURLs.contains($0) }
+
+        #if DEBUG
+        print("\n[MainView] viewList called")
+        print("[MainView] Selected files: \(chosen.count)")
+        for url in chosen {
+            print("  - \(url.lastPathComponent)")
+        }
+        #endif
+
+        var combined: [(prompt: String, translation: String)] = []
+        for url in chosen {
+            if let deck = parseVocabularyFile(at: url) {
+                combined.append(contentsOf: deck)
+            }
+        }
+
+        guard !combined.isEmpty else { return }
+
+        listDeck = combined
+        navigateToList = true
     }
 }
 
